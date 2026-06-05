@@ -1,0 +1,55 @@
+# C++ 编译输出
+*.obj
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.iobj
+*.ipdb
+
+# 可执行文件和 DLL
+*.exe
+*.dll
+
+# 构建输出目录
+bin/
+separated/bin/
+combined/bin/
+out/
+build/
+x64/
+x86/
+Debug/
+Release/
+
+# Visual Studio 生成文件
+.vs/
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.sln
+*.suo
+*.user
+*.aps
+
+# 自动生成的头文件（由 build.ps1 生成）
+combined/generated_dll_bytes.h
+
+# 临时文件
+*.tmp
+*.temp
+*_payload.dll
+
+# Windows 系统文件
+Thumbs.db
+Desktop.ini
+
+# 编辑器文件
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 日志
+*.log
