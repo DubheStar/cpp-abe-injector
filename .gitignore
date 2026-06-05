@@ -22,15 +22,14 @@ x86/
 Debug/
 Release/
 
-# Visual Studio 生成文件
+# Visual Studio 生成文件（保留项目文件，排除用户私有文件）
 .vs/
-*.vcxproj
 *.vcxproj.filters
 *.vcxproj.user
-*.sln
 *.suo
 *.user
 *.aps
+obj/
 
 # 自动生成的头文件（由 build.ps1 生成）
 combined/generated_dll_bytes.h
