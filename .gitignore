@@ -34,6 +34,8 @@ obj/
 # 自动生成的头文件（由 build.ps1 生成）
 combined/generated_dll_bytes.h
 
+# sqlite3 amalgamation 保留在仓库中（libs/sqlite/），不排除
+
 # 临时文件
 *.tmp
 *.temp
