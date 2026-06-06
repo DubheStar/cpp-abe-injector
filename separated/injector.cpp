@@ -271,11 +271,14 @@ static char* AesGcmDecrypt(const BYTE* blob, DWORD blobLen,
 }
 
 // Escape a string for JSON output (handles control chars and quotes).
-static void WriteJsonString(FILE* fp, const char* s)
+// len = byte length; if len == -1, use strlen(s)
+static void WriteJsonString(FILE* fp, const char* s, int len = -1)
 {
+    if (!s) { fputs("\"\"", fp); return; }
+    if (len < 0) len = (int)strlen(s);
     fputc('"', fp);
-    for (; *s; s++) {
-        unsigned char c = (unsigned char)*s;
+    for (int i = 0; i < len; i++) {
+        unsigned char c = (unsigned char)s[i];
         if      (c == '"')  fputs("\\\"", fp);
         else if (c == '\\') fputs("\\\\", fp);
         else if (c == '\n') fputs("\\n",  fp);
@@ -350,7 +353,7 @@ static bool DecryptAndExport(const wchar_t* dbPath, const BYTE* key,
     // Chrome 时间戳基准：1601-01-01 到 1970-01-01 的微秒数
     const long long CHROME_EPOCH_OFFSET = 11644473600000000LL;
 
-    fputs("[\n", fp);
+    fputs("\xEF\xBB\xBF[\n", fp);  // UTF-8 BOM + array open
     int count = 0, total = 0;
 
     while (sqlite3_step(stmt) == SQLITE_ROW) {
@@ -376,7 +379,7 @@ static bool DecryptAndExport(const wchar_t* dbPath, const BYTE* key,
         if (count > 0) fputs(",\n", fp);
         fputs("  {\n", fp);
         fprintf(fp, "    \"name\": ");      WriteJsonString(fp, name   ? name : ""); fputs(",\n", fp);
-        fprintf(fp, "    \"value\": ");     WriteJsonString(fp, plain);              fputs(",\n", fp);
+        fprintf(fp, "    \"value\": ");     WriteJsonString(fp, plain, (int)plainLen); fputs(",\n", fp);
         fprintf(fp, "    \"domain\": ");    WriteJsonString(fp, host   ? host : ""); fputs(",\n", fp);
         fprintf(fp, "    \"path\": ");      WriteJsonString(fp, path   ? path : ""); fputs(",\n", fp);
         fprintf(fp, "    \"expires\": %lld,\n", expUnix);
