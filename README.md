@@ -66,32 +66,46 @@ Payload DLL (payload_dll.cpp，运行在 Chrome 进程中)
 
 ## 编译
 
-### 一键编译（推荐）
+### 推荐方式：MSBuild（Visual Studio 自带，无需手写路径）
 
 ```powershell
-# 以管理员权限打开 PowerShell
-cd D:\ClaudeCode-Home\JoyAI\projects\cpp-abe-injector
+# 以管理员权限打开 PowerShell，进入项目目录
+cd D:\...\cpp-abe-injector
 
-# 编译全部版本
-.\build.ps1
-
-# 仅编译 separated 版本
-.\build.ps1 -Separated
-
-# 仅编译 combined 版本
-.\build.ps1 -Combined
+# 编译 separated 版本（payload_dll.dll + injector.exe）
+msbuild ChromeABE.sln /p:Configuration=Release /p:Platform=x64 /m /nologo
 ```
 
-### 手动编译
+输出在 `bin\` 目录：
+- `bin\payload_dll.dll`
+- `bin\injector.exe`
+
+> MSBuild 会自动定位 Visual Studio 工具链，无需指定 cl.exe 路径。
+
+### 备用方式：build_direct.ps1（手动指定 MSVC 路径）
+
+适用于 MSBuild 找不到工具链的情况。前提：`C:\cl_x64\cl.exe`、`C:\msvc`、`C:\winsdk` 已配置（参见下方说明）。
 
 ```powershell
-# Separated 版本
-cd separated
-.\build.ps1
+# separated 版本
+.\build_direct.ps1
 
-# Combined 版本
-cd combined
-.\build.ps1
+# separated + combined 版本（all_in_one.exe，DLL 内嵌）
+.\build_direct.ps1 -Combined
+
+# 跳过重新编译 payload（使用已有 DLL）
+.\build_direct.ps1 -SkipPayload -ExistingDll "C:\path\to\payload_dll.dll"
+```
+
+#### 配置 build_direct.ps1 前提环境
+
+```powershell
+# 1. 复制 cl.exe（从 VS 安装目录，具体路径因版本而异）
+Copy-Item "C:\Program Files\Microsoft Visual Studio\...\bin\Hostx64\x64\cl.exe" C:\cl_x64\
+
+# 2. 创建 junction 链接（避免路径空格问题）
+cmd /c "mklink /J C:\msvc  `"C:\Program Files\Microsoft Visual Studio\...\VC\Tools\MSVC\<ver>`""
+cmd /c "mklink /J C:\winsdk `"C:\Program Files (x86)\Windows Kits\10`""
 ```
 
 ---
@@ -134,22 +148,23 @@ cd combined\bin
 
 ```
 cpp-abe-injector/
-├── README.md               本文件
+├── README.md
 ├── .gitignore
-├── build.ps1               根目录构建脚本（编译全部版本）
+├── ChromeABE.sln           MSBuild 解决方案（推荐编译入口）
+├── build_direct.ps1        备用构建脚本（手动 MSVC 路径）
 │
-├── separated/              分离版本（injector + DLL 分开）
+├── separated/              分离版本（injector + DLL 独立）
 │   ├── injector.cpp        注入器（Hell's Gate + 两阶段注入）
-│   ├── payload_dll.cpp     Payload DLL（IElevator COM 解密）
-│   ├── build.ps1
-│   └── bin/                (编译输出)
+│   ├── payload_dll.cpp     Payload DLL（IElevator COM 解密 + 句柄复制）
+│   ├── injector.vcxproj    MSBuild 项目文件
+│   ├── payload_dll.vcxproj MSBuild 项目文件
+│   └── bin/                编译输出（gitignore）
 │       ├── injector.exe
 │       └── payload_dll.dll
 │
-└── combined/               合并版本（单 EXE，DLL 内嵌）
+└── combined/               合并版本（DLL 内嵌到单 EXE）
     ├── all_in_one.cpp      单文件版（含 --extract 模式）
-    ├── build.ps1           (自动生成 generated_dll_bytes.h)
-    └── bin/                (编译输出)
+    └── bin/                编译输出（gitignore）
         └── all_in_one.exe
 ```
 
