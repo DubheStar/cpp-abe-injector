@@ -270,7 +270,8 @@ static char* AesGcmDecrypt(const BYTE* blob, DWORD blobLen,
     return (char*)plain;
 }
 
-// Escape a string for JSON output (handles control chars and quotes).
+// Escape a string for JSON output.
+// All non-ASCII bytes are written as \uXXXX to guarantee valid ASCII/JSON.
 // len = byte length; if len == -1, use strlen(s)
 static void WriteJsonString(FILE* fp, const char* s, int len = -1)
 {
@@ -284,7 +285,7 @@ static void WriteJsonString(FILE* fp, const char* s, int len = -1)
         else if (c == '\n') fputs("\\n",  fp);
         else if (c == '\r') fputs("\\r",  fp);
         else if (c == '\t') fputs("\\t",  fp);
-        else if (c < 0x20)  fprintf(fp, "\\u%04X", c);
+        else if (c < 0x20 || c >= 0x80) fprintf(fp, "\\u%04X", c);  // escape non-ASCII
         else                fputc(c, fp);
     }
     fputc('"', fp);
@@ -372,14 +373,39 @@ static bool DecryptAndExport(const wchar_t* dbPath, const BYTE* key,
 
         DWORD plainLen = 0;
         char* plain = AesGcmDecrypt(encVal, (DWORD)encLen, key, 32, &plainLen);
-        if (!plain) continue;  // 解密失败则跳过
+        if (!plain) continue;
+
+        // Strip the optional origin-binding prefix Chrome prepends to v20 cookies.
+        // Two variants observed:
+        //   - 32 bytes: mostly non-printable binary (easy to detect)
+        //   - 20 bytes: mixed printable+binary (harder)
+        // Strategy: check both 20-byte and 32-byte windows.
+        // If a window has >= 40% non-ASCII bytes, treat it as a binary prefix.
+        char* valuePtr = plain;
+        DWORD valueLen = plainLen;
+
+        auto countNonAscii = [](const char* p, int n) -> int {
+            int cnt = 0;
+            for (int k = 0; k < n; k++)
+                if ((unsigned char)p[k] >= 0x80 || (unsigned char)p[k] < 0x20)
+                    cnt++;
+            return cnt;
+        };
+
+        if (plainLen > 32 && countNonAscii(plain, 32) * 100 / 32 >= 40) {
+            valuePtr = plain + 32;
+            valueLen = plainLen - 32;
+        } else if (plainLen > 20 && countNonAscii(plain, 20) * 100 / 20 >= 40) {
+            valuePtr = plain + 20;
+            valueLen = plainLen - 20;
+        }
 
         long long expUnix = expTs > 0 ? (expTs - CHROME_EPOCH_OFFSET) / 1000000LL : -1;
 
         if (count > 0) fputs(",\n", fp);
         fputs("  {\n", fp);
         fprintf(fp, "    \"name\": ");      WriteJsonString(fp, name   ? name : ""); fputs(",\n", fp);
-        fprintf(fp, "    \"value\": ");     WriteJsonString(fp, plain, (int)plainLen); fputs(",\n", fp);
+        fprintf(fp, "    \"value\": ");     WriteJsonString(fp, valuePtr, (int)valueLen); fputs(",\n", fp);
         fprintf(fp, "    \"domain\": ");    WriteJsonString(fp, host   ? host : ""); fputs(",\n", fp);
         fprintf(fp, "    \"path\": ");      WriteJsonString(fp, path   ? path : ""); fputs(",\n", fp);
         fprintf(fp, "    \"expires\": %lld,\n", expUnix);
